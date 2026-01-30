@@ -50,9 +50,15 @@ for sinif in siniflar:
 
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.models import Model
+import os
 
 # 1. Veri Artırma ve Hazırlama Kurallarını Tanımlayalım
 # Sadece Eğitim verisi için artırma yapıyoruz, doğrulama sadece ölçeklenir.
+base_dir = 'data'
+
 train_datagen = ImageDataGenerator(
     rescale=1./255,            # Piksel değerlerini 0-1 arasına çeker
     rotation_range=40,         # 40 dereceye kadar rastgele döndür
@@ -83,4 +89,30 @@ validation_generator = train_datagen.flow_from_directory(
     subset='validation'        # %20'lik test kısmını al
 )
 
+#MODEL MİMARİSİ (TRANSFER LEARNING)
+# Önceden eğitilmiş MobileNetV2'yi yükle
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+# Temel katmanları dondur
+base_model.trainable = False
+
+# Kendi katmanlarımızı ekleyelim
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(128, activation='relu')(x)
+x = Dropout(0.2)(x) # Overfitting önlemek için
+predictions = Dense(6, activation='softmax')(x) # 6 farklı atık türü için
+
+# Nihai modeli oluştur
+model = Model(inputs=base_model.input, outputs=predictions)
+
+# Modeli derle
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Modelin özetini bastır
+model.summary()
+
+print("\n--- Kurulum Başarılı! ---")
 print("Sınıf İndeksleri: ", train_generator.class_indices)
