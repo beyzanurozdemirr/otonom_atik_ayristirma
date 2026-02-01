@@ -54,20 +54,31 @@ from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.models import Model
 import os
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from PIL import Image
+
+# 1. TEMİZLİK: Bozuk dosyaları ayıkla
+def temizle(dizin):
+    for root, dirs, files in os.walk(dizin):
+        for file in files:
+            dosya_yolu = os.path.join(root, file)
+            try:
+                with Image.open(dosya_yolu) as img:
+                    img.verify()
+            except:
+                os.remove(dosya_yolu)
+                print(f"Silindi: {dosya_yolu}")
+
+temizle('data')
 
 # 1. Veri Artırma ve Hazırlama Kurallarını Tanımlayalım
 # Sadece Eğitim verisi için artırma yapıyoruz, doğrulama sadece ölçeklenir.
-base_dir = 'data'
 
 train_datagen = ImageDataGenerator(
     rescale=1./255,            # Piksel değerlerini 0-1 arasına çeker
     rotation_range=40,         # 40 dereceye kadar rastgele döndür
-    width_shift_range=0.2,     # Yatayda %20 kaydır
-    height_shift_range=0.2,    # Dikeyde %20 kaydır
-    shear_range=0.2,           # Eğriltme uygula
     zoom_range=0.2,            # Yakınlaştırma yap
     horizontal_flip=True,      # Yatayda çevi
-    fill_mode='nearest',       # Kaydırma sonrası boşlukları en yakın piksellerle doldur
     validation_split=0.2       # Verinin %20'sini test/doğrulama için ayır
 )
 
@@ -97,22 +108,22 @@ base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224
 base_model.trainable = False
 
 # Kendi katmanlarımızı ekleyelim
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
+x = GlobalAveragePooling2D()(base_model.output)
 x = Dense(128, activation='relu')(x)
-x = Dropout(0.2)(x) # Overfitting önlemek için
-predictions = Dense(6, activation='softmax')(x) # 6 farklı atık türü için
+x = Dropout(0.2)(x)
+output = Dense(6, activation='softmax')(x) # 6 farklı atık türü için
 
 # Nihai modeli oluştur
-model = Model(inputs=base_model.input, outputs=predictions)
+model = Model(inputs=base_model.input, outputs=output)
 
 # Modeli derle
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
-# Modelin özetini bastır
-model.summary()
+# 4. EĞİTİM
+checkpoint = ModelCheckpoint('atik_modeli.keras', monitor='val_accuracy', save_best_only=True)
+early_stop = EarlyStopping(monitor='val_loss', patience=3)
 
-print("\n--- Kurulum Başarılı! ---")
-print("Sınıf İndeksleri: ", train_generator.class_indices)
+print("\n--- Eğitim Başlıyor... ---")
+model.fit(train_generator, validation_data=validation_generator, epochs=10, callbacks=[early_stop, checkpoint])
