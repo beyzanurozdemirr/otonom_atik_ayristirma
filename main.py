@@ -21,7 +21,7 @@ train_data = datagen.flow_from_directory(
     subset='training'
 )
 
-# Doğrulama (Validation) verilerini yükleyelim
+# Doğrulama (Validation) verilerini yükleyelim.
 val_data = datagen.flow_from_directory(
     base_dir,
     target_size=(224, 224),

@@ -56,7 +56,7 @@ with gr.Blocks(css=custom_css) as demo:
     with gr.Row():
         with gr.Column():
             in_img = gr.Image(label="Atık Resmini Buraya Bırak")
-            btn = gr.Button("🔍 SİSTEMİ ÇALIŞTIR", variant="primary")
+            btn = gr.Button("SİSTEMİ ÇALIŞTIR", variant="primary")
 
         with gr.Column():
             out_label = gr.Label(num_top_classes=3, label="Analiz Sonuçları")
