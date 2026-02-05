@@ -53,9 +53,10 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.models import Model
-import os
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+import os
 from PIL import Image
+import matplotlib.pyplot as plt
 
 # 1. TEMİZLİK: Bozuk dosyaları ayıkla
 def temizle(dizin):
@@ -66,8 +67,9 @@ def temizle(dizin):
                 with Image.open(dosya_yolu) as img:
                     img.verify()
             except:
-                os.remove(dosya_yolu)
-                print(f"Silindi: {dosya_yolu}")
+                if os.path.exists(dosya_yolu):
+                    os.remove(dosya_yolu)
+                    print(f"Silindi: {dosya_yolu}")
 
 temizle('data')
 
@@ -76,8 +78,10 @@ temizle('data')
 
 train_datagen = ImageDataGenerator(
     rescale=1./255,            # Piksel değerlerini 0-1 arasına çeker
-    rotation_range=40,         # 40 dereceye kadar rastgele döndür
+    rotation_range=25,         # 20 dereceye kadar rastgele döndür
     zoom_range=0.2,            # Yakınlaştırma yap
+    width_shift_range=0.1,
+    height_shift_range=0.1,
     horizontal_flip=True,      # Yatayda çevi
     validation_split=0.2       # Verinin %20'sini test/doğrulama için ayır
 )
@@ -110,7 +114,7 @@ base_model.trainable = False
 # Kendi katmanlarımızı ekleyelim
 x = GlobalAveragePooling2D()(base_model.output)
 x = Dense(128, activation='relu')(x)
-x = Dropout(0.2)(x)
+x = Dropout(0.3)(x)
 output = Dense(6, activation='softmax')(x) # 6 farklı atık türü için
 
 # Nihai modeli oluştur
@@ -121,9 +125,32 @@ model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
-# 4. EĞİTİM
+# 4. EĞİTİM YARDIMCILARI
 checkpoint = ModelCheckpoint('atik_modeli.keras', monitor='val_accuracy', save_best_only=True)
-early_stop = EarlyStopping(monitor='val_loss', patience=3)
+early_stop = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
+# --- 5. EĞİTİM ---
 print("\n--- Eğitim Başlıyor... ---")
-model.fit(train_generator, validation_data=validation_generator, epochs=10, callbacks=[early_stop, checkpoint])
+history = model.fit(
+    train_generator,
+    validation_data=validation_generator,
+    epochs=15, # Daha iyi sonuç için 15 yapıldı
+    callbacks=[early_stop, checkpoint]
+)
+
+# --- 6. GRAFİKLER ---
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='Eğitim Başarısı')
+plt.plot(history.history['val_accuracy'], label='Doğrulama Başarısı')
+plt.title('Başarı Oranı')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='Eğitim Hatası')
+plt.plot(history.history['val_loss'], label='Doğrulama Hatası')
+plt.title('Hata Payı')
+plt.legend()
+plt.show()
+
+print("\nEğitim tamamlandı. Sınıf İndeksleri:", train_generator.class_indices)
